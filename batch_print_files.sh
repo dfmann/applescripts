@@ -2,25 +2,29 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 -p <printer> -s <paper_size> <file1> [file2 ...]"
+    echo "Usage: $0 -p <printer> -s <paper_size> [-f <file_list>] [file1 ...]"
     echo ""
     echo "Options:"
     echo "  -p <printer>      Printer name (see 'lpstat -p' for available printers)"
     echo "  -s <paper_size>   Paper size (e.g. Letter, Legal, A4, A3, Tabloid)"
+    echo "  -f <file_list>    File containing a list of files to print (one per line)"
     echo "  -h                Show this help message"
     echo ""
     echo "Example:"
     echo "  $0 -p MyPrinter -s A4 report.pdf slides.pdf"
-    exit 1
+    echo "  $0 -p MyPrinter -s A4 -f filelist.txt"
+    exit 0
 }
 
 printer=""
 paper_size=""
+file_list=""
 
-while getopts ":p:s:h" opt; do
+while getopts ":p:s:f:h" opt; do
     case $opt in
         p) printer="$OPTARG" ;;
         s) paper_size="$OPTARG" ;;
+        f) file_list="$OPTARG" ;;
         h) usage ;;
         :) echo "Error: -$OPTARG requires an argument." >&2; exit 1 ;;
         \?) echo "Error: Unknown option -$OPTARG" >&2; exit 1 ;;
@@ -31,6 +35,20 @@ shift $((OPTIND - 1))
 if [[ -z "$printer" || -z "$paper_size" ]]; then
     echo "Error: Both -p (printer) and -s (paper size) are required." >&2
     usage
+fi
+
+# If a file list was provided, read its entries into the positional parameters
+if [[ -n "$file_list" ]]; then
+    if [[ ! -f "$file_list" ]]; then
+        echo "Error: File list '$file_list' not found." >&2
+        exit 1
+    fi
+    files_from_list=()
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        files_from_list+=("$line")
+    done < "$file_list"
+    set -- "${files_from_list[@]}" "$@"
 fi
 
 if [[ $# -eq 0 ]]; then
