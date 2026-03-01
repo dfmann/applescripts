@@ -63,11 +63,37 @@ if ! lpstat -p "$printer" &>/dev/null; then
     exit 1
 fi
 
+# Collect valid files
+valid_files=()
 for file in "$@"; do
     if [[ ! -f "$file" ]]; then
         echo "Warning: '$file' not found, skipping." >&2
         continue
     fi
-    echo "Printing '$file' to '$printer' on $paper_size paper..."
-    lp -d "$printer" -o media="$paper_size" "$file"
+    valid_files+=("$file")
 done
+
+if [[ ${#valid_files[@]} -eq 0 ]]; then
+    echo "Error: No valid files to print." >&2
+    exit 1
+fi
+
+# Merge all files into a single PDF
+merged_pdf=$(mktemp /tmp/batch_print_merged_XXXXXX.pdf)
+trap 'rm -f "$merged_pdf"' EXIT
+
+join_tool="/System/Library/Automator/Combine PDF Pages.action/Contents/MacOS/join"
+if [[ -x "$join_tool" ]]; then
+    "$join_tool" -o "$merged_pdf" "${valid_files[@]}"
+elif command -v gs &>/dev/null; then
+    gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile="$merged_pdf" "${valid_files[@]}"
+else
+    echo "Error: No PDF merge tool found." >&2
+    echo "Install Ghostscript (brew install ghostscript) or ensure macOS Automator is available." >&2
+    exit 1
+fi
+
+# Print the single merged PDF
+echo "Printing merged PDF (${#valid_files[@]} files) to '$printer' on $paper_size paper..."
+lp -d "$printer" -o media="$paper_size" "$merged_pdf"
+
