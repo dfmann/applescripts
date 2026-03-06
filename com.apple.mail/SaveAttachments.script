@@ -1,0 +1,14 @@
+using terms from application "Mail"
+	on perform mail action with messages theMessages for rule theRule
+		set attachmentsFolder to (path to downloads folder rule type string)
+		tell application "Mail"
+			repeat with eachMessage in theMessages
+				repeat with eachAttachment in eachMessage's mail attachments
+					set attachmentName to name of eachAttachment
+					set savePath to attachmentsFolder & attachmentName
+					save eachAttachment in savePath
+				end repeat
+			end repeat
+		end tell
+	end perform mail action with messages
+end using terms from
